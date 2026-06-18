@@ -1,7 +1,9 @@
 import type { FormEvent } from 'react'
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { useNavigate } from 'react-router-dom'
 import { X } from 'lucide-react'
+import { DEMO_CREDENTIALS, login } from '../../lib/auth'
 
 interface LoginModalProps {
   open: boolean
@@ -9,11 +11,12 @@ interface LoginModalProps {
 }
 
 export default function LoginModal({ open, onClose }: LoginModalProps) {
+  const navigate = useNavigate()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({})
   const [loading, setLoading] = useState(false)
-  const [message, setMessage] = useState('')
+  const [authError, setAuthError] = useState('')
   const emailRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -39,21 +42,28 @@ export default function LoginModal({ open, onClose }: LoginModalProps) {
     const next: { email?: string; password?: string } = {}
     if (!email.trim()) next.email = 'Email or username is required'
     if (!password) next.password = 'Password is required'
-    else if (password.length < 6) next.password = 'Password must be at least 6 characters'
     setErrors(next)
     return Object.keys(next).length === 0
   }
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
-    setMessage('')
+    setAuthError('')
     if (!validate()) return
 
     setLoading(true)
-    await new Promise((r) => setTimeout(r, 800))
+    await new Promise((r) => setTimeout(r, 500))
+
+    const success = login(email.trim(), password)
     setLoading(false)
-    setMessage('Login submitted (demo). Connect a backend API to enable tracking access.')
-    console.log('Staff login attempt:', { email: email.trim() })
+
+    if (success) {
+      onClose()
+      navigate('/services')
+      return
+    }
+
+    setAuthError('Invalid credentials. Use the demo login shown below.')
   }
 
   return createPortal(
@@ -83,8 +93,18 @@ export default function LoginModal({ open, onClose }: LoginModalProps) {
           Staff Login
         </h2>
         <p className="mt-1 text-sm text-muted">
-          Sign in to access the Gudivada tracking portal.
+          Sign in to access the Gudivada services tracking portal.
         </p>
+
+        <div className="mt-4 rounded border border-gold/50 bg-gold/10 px-3 py-2 text-xs text-body">
+          <p className="font-semibold text-maroon">Demo credentials</p>
+          <p className="mt-1">
+            Email: <span className="font-mono">{DEMO_CREDENTIALS.username}</span>
+          </p>
+          <p>
+            Password: <span className="font-mono">{DEMO_CREDENTIALS.password}</span>
+          </p>
+        </div>
 
         <form onSubmit={handleSubmit} className="mt-6 space-y-4" noValidate>
           <div>
@@ -98,6 +118,7 @@ export default function LoginModal({ open, onClose }: LoginModalProps) {
               autoComplete="username"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              placeholder={DEMO_CREDENTIALS.username}
               className={`w-full rounded border px-3 py-2 text-sm outline-none focus:border-maroon focus:ring-1 focus:ring-maroon ${
                 errors.email ? 'border-red-500' : 'border-border'
               }`}
@@ -126,15 +147,8 @@ export default function LoginModal({ open, onClose }: LoginModalProps) {
             )}
           </div>
 
-          <button
-            type="button"
-            className="text-xs text-maroon hover:underline"
-          >
-            Forgot password?
-          </button>
-
-          {message && (
-            <p className="rounded bg-gold/30 px-3 py-2 text-xs text-body">{message}</p>
+          {authError && (
+            <p className="rounded bg-red-50 px-3 py-2 text-xs text-red-700">{authError}</p>
           )}
 
           <button
